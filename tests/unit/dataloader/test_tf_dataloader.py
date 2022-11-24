@@ -16,6 +16,7 @@
 
 import importlib.util
 import os
+import random
 import subprocess
 import time
 import timeit
@@ -75,6 +76,34 @@ def test_simple_model():
     assert preds_model.shape == preds_loader.shape
 
     _ = model.evaluate(loader)
+
+
+def test_list_features_load_time(tmpdir):
+    num_rows = 1000
+    num_features = 40
+
+    df = make_df(
+        {
+            f"feature_{i}": [[random.randint(1, 10) for _ in range(4)] for _ in range(num_rows)]
+            for i in range(num_features)
+        }
+    )
+    dataset = Dataset(df)
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+
+    start_t = time.time()
+    _ = next(loader)
+    end_t = time.time()
+    first_batch_load_time = end_t - start_t
+    assert first_batch_load_time < 1.0
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+    start_t = time.time()
+    for _ in loader:
+        pass
+    end_t = time.time()
+    full_load_time = end_t - start_t
+    assert full_load_time < 1.0
 
 
 def test_nested_list():
