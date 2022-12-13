@@ -78,17 +78,143 @@ def test_simple_model():
     _ = model.evaluate(loader)
 
 
-def test_list_features_load_time(tmpdir):
+def test_fixed_list_features_load_time(tmpdir):
     num_rows = 1000
     num_features = 40
 
-    df = make_df(
-        {
-            f"feature_{i}": [[random.randint(1, 10) for _ in range(4)] for _ in range(num_rows)]
-            for i in range(num_features)
-        }
-    )
+    fixed_list_features = {
+        f"fixed_list_{i}": [[random.randint(1, 10) for _ in range(4)] for _ in range(num_rows)]
+        for i in range(num_features)
+    }
+
+    df_dict = fixed_list_features
+
+    df = make_df(df_dict)
     dataset = Dataset(df)
+
+    for col in dataset.schema:
+        if col.name.startswith("fixed_list"):
+            dataset.schema[col.name] = col.with_dtype(col.dtype, is_ragged=False).with_properties(
+                {"value_count": {"max": 4}}
+            )
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+
+    start_t = time.time()
+    _ = next(loader)
+    end_t = time.time()
+    first_batch_load_time = end_t - start_t
+    assert first_batch_load_time < 2.0
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+    start_t = time.time()
+    for _ in loader:
+        pass
+    end_t = time.time()
+    full_load_time = end_t - start_t
+    assert full_load_time < 2.0
+    print(f"first_batch_load_time: {first_batch_load_time:.05f}")
+    print(f"full_load_time: {full_load_time:.05f}")
+
+
+def test_ragged_list_features_load_time(tmpdir):
+    num_rows = 1000
+    num_features = 40
+
+    ragged_list_features = {
+        f"ragged_list_{i}": [
+            [random.randint(1, 10) for _ in range(random.randint(1, 4))] for _ in range(num_rows)
+        ]
+        for i in range(num_features)
+    }
+
+    df_dict = ragged_list_features
+
+    df = make_df(df_dict)
+    dataset = Dataset(df)
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+
+    start_t = time.time()
+    _ = next(loader)
+    end_t = time.time()
+    first_batch_load_time = end_t - start_t
+    # assert first_batch_load_time < 1.0
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+    start_t = time.time()
+    for _ in loader:
+        pass
+    end_t = time.time()
+    full_load_time = end_t - start_t
+    # assert full_load_time < 1.0
+
+    print(f"first_batch_load_time: {first_batch_load_time:.05f}")
+    print(f"full_load_time: {full_load_time:.05f}")
+
+
+def test_scalar_features_load_time(tmpdir):
+    num_rows = 1000
+    num_features = 40
+
+    scalar_features = {
+        f"scalar_{i}": [random.randint(1, 10) for _ in range(num_rows)] for i in range(num_features)
+    }
+
+    df_dict = scalar_features
+
+    df = make_df(df_dict)
+    dataset = Dataset(df)
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+
+    start_t = time.time()
+    _ = next(loader)
+    end_t = time.time()
+    first_batch_load_time = end_t - start_t
+    assert first_batch_load_time < 1.0
+
+    loader = tf_dataloader.Loader(dataset, batch_size=1)
+    start_t = time.time()
+    for _ in loader:
+        pass
+    end_t = time.time()
+    full_load_time = end_t - start_t
+    assert full_load_time < 1.0
+
+    print(f"first_batch_load_time: {first_batch_load_time:.05f}")
+    print(f"full_load_time: {full_load_time:.05f}")
+
+
+def test_all_features_load_time(tmpdir):
+    num_rows = 1000
+    num_features = 3
+
+    fixed_list_features = {
+        f"fixed_list_{i}": [[random.randint(1, 10) for _ in range(4)] for _ in range(num_rows)]
+        for i in range(num_features)
+    }
+    ragged_list_features = {
+        f"ragged_list_{i}": [
+            [random.randint(1, 10) for _ in range(random.randint(1, 10))] for _ in range(num_rows)
+        ]
+        for i in range(num_features)
+    }
+    scalar_features = {
+        f"scalar_{i}": [random.randint(1, 10) for _ in range(num_rows)] for i in range(num_features)
+    }
+
+    df_dict = {**fixed_list_features, **ragged_list_features, **scalar_features}
+
+    df = make_df(df_dict)
+    dataset = Dataset(df)
+
+    for col in dataset.schema:
+        if col.name.startswith("fixed_list"):
+            dataset.schema[col.name] = col.with_dtype(col.dtype, is_ragged=False).with_properties(
+                {"value_count": {"max": 4}}
+            )
+
     loader = tf_dataloader.Loader(dataset, batch_size=1)
 
     start_t = time.time()
