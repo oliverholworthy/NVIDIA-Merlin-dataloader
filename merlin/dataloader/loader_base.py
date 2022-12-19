@@ -397,7 +397,8 @@ class LoaderBase:
 
                 # split them into batches, including an extra 1 on the offsets
                 # so we know how long the very last element is
-                batch_offsets = self._split_fn(chunk_offsets, split_idx + [1])
+                batch_offsets = self._split_fn(chunk_offsets, [idx + 1 for idx in split_idx])
+                # batch_offsets = self._split_fn(chunk_offsets, split_idx + [1])
                 if use_nnz and len(split_idx) > 1:
                     batch_nnzs = self._split_fn(chunk_nnzs, split_idx)
                 elif use_nnz:
@@ -408,7 +409,7 @@ class LoaderBase:
                 # group all these indices together and iterate through
                 # them in batches to grab the proper elements from each
                 # values tensor
-                chunk = zip(chunk, batch_offsets[:-1], batch_offsets[1:], batch_nnzs)
+                chunk = zip(chunk, batch_offsets[:1], batch_offsets[1:], batch_nnzs)
 
             for n, c in enumerate(chunk):
                 if isinstance(c, tuple):

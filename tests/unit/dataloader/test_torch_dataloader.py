@@ -35,6 +35,26 @@ torch = pytest.importorskip("torch")
 import merlin.dataloader.torch as torch_dataloader  # noqa isort:skip
 
 
+def test_offsets():
+    df = make_df(
+        {
+            "list_feature": [[1, 2], [3, 4]],
+            "ragged_feature": [[1, 2], [3]],
+            "scalar_feature": [1, 2],
+        }
+    )
+    dataset = Dataset(df)
+    dataset.schema["list_feature"] = (
+        dataset.schema["list_feature"]
+        .with_dtype(dataset.schema["list_feature"].dtype, is_ragged=False)
+        .with_properties({"value_count": {"max": 2, "min": 2}})
+    )
+    loader = torch_dataloader.Loader(dataset, batch_size=5)
+    x, y = loader.peek()
+    assert x["ragged_feature"][0].cpu().numpy().tolist() == [1, 2, 3]
+    assert x["ragged_feature"][1].cpu().numpy().tolist() == [[0], [2], [3]]
+
+
 def test_shuffling():
     num_rows = 10000
     batch_size = 10000
