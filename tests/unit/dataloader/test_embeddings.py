@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from merlin.core.compat import cupy
 from merlin.core.dispatch import HAS_GPU
 from merlin.dataloader.loader_base import LoaderBase as Loader  # noqa
 from merlin.dataloader.ops.embeddings import EmbeddingOperator
@@ -26,6 +27,45 @@ from merlin.dataloader.ops.padding import Padding
 from merlin.io import Dataset
 from merlin.schema import Tags
 from merlin.table import TensorColumn, TensorTable
+
+
+def test_embedding_lookup_with_string_ids():
+    id_lookup_table = np.array(["a", "b", "c"])
+    embeddings = np.random.rand(3, 10)
+    df = pd.DataFrame(
+        {
+            "id": ["a", "b", "c"],
+            "feature": [1, 2, 3],
+            "target": [0, 1, 1],
+        }
+    )
+
+    dataset = Dataset(df)
+    dataset.schema["target"] = dataset.schema["target"].with_tags(Tags.TARGET)
+
+    data_loader = Loader(
+        dataset,
+        batch_size=2,
+        transforms=[
+            EmbeddingOperator(
+                embeddings,
+                lookup_key="id",
+                embedding_name="id_embedding",
+                id_lookup_table=id_lookup_table,
+            ),
+        ],
+        device="cpu",  # Embedding lookup with string ids doesn't currently work on GPU
+        shuffle=False,
+    )
+    x, y = data_loader.peek()
+    assert x["id"].values.shape == (2,)
+    embedding_values = x["id_embedding"].values
+    if cupy and isinstance(embedding_values, cupy.ndarray):
+        embedding_values = embedding_values.get()
+    assert x["id_embedding"].values.shape == (2, 10)
+    np.testing.assert_equal(embedding_values, embeddings[[True, True, False]])
+    assert data_loader.output_schema.column_names == ["id", "feature", "id_embedding"]
+    assert y.tolist() == [0, 1]
 
 
 def test_embedding_with_target():
